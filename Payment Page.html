@@ -1,0 +1,370 @@
+Payment Page
+<!DOCTYPE html>
+<html>
+    <body>
+        <br />
+        <div>
+            <button id="btnOpenAuthorizeNetPopup">Open AuthorizeNetPopup</button>
+        </div>
+        <div id="iframe_holder" class="center-block" style="width: 100%; height: 100vh; overflow: hidden;">
+            <iframe id="iframeAuthorizeNet" name="iframeAuthorizeNet" class="embed-responsive-item panel" 
+                    style="width: 100%; height: 100%; border: 0px #ffffff none; overflow: hidden;"
+                    frameborder="0" scrolling="no">
+            </iframe>
+        </div>
+        
+        </div>
+    
+        <script type="text/javascript">
+                    // Declare global variables
+            var userId, firstName, lastName, fullName, userName, userEmail, contactId, crmUserId, parentCustomerId, parentCustomerType, priceListId, roles;
+    
+            // Check if tpc.identity object exists
+            if (window.tpc && window.tpc.identity) {
+                // Assign values to global variables
+                userId = window.tpc.identity.userId;
+                firstName = window.tpc.identity.firstName;
+                lastName = window.tpc.identity.lastName;
+                fullName = window.tpc.identity.fullName;
+                userName = window.tpc.identity.userName;
+                userEmail = window.tpc.identity.userEmail;
+                contactId = window.tpc.identity.contactId;
+                crmUserId = window.tpc.identity.crmUserId;
+                parentCustomerId = window.tpc.identity.parentCustomerId;
+                parentCustomerType = window.tpc.identity.parentCustomerType;
+                priceListId = window.tpc.identity.priceListId;
+                roles = window.tpc.identity.roles;
+    
+                // Use the retrieved information as needed
+                console.log("User ID:", userId);
+                console.log("First Name:", firstName);
+                console.log("Last Name:", lastName);
+                console.log("Full Name:", fullName);
+                console.log("Username:", userName);
+                console.log("Email:", userEmail);
+                console.log("Contact ID:", contactId);
+                console.log("CRM User ID:", crmUserId);
+                console.log("Parent Customer ID:", parentCustomerId);
+                console.log("Parent Customer Type:", parentCustomerType);
+    
+    
+                // Declare a global variable to store the payment gateway information
+                var paymentGatewayInfo;
+
+                // Define the paymentGateway function
+                function paymentGateway() {
+                    $.ajax({
+                        url: location.origin + "/SavedQueryService/Execute/paymentgateway",
+                        async: true, // Set async to true to make it asynchronous
+                        dataType: "json", 
+                        success: function(data) {
+                            // Extract data from response
+                            var paymentGatewayData = $(data).find("item").map(function() {
+                                return {
+                                    name: $(this).attr("cmc_paymentgateway"),
+                                    username: $(this).attr("cmc_paymentgatewayusername"),
+                                    Key: $(this).attr("cmc_paymentgatewaypassword"),
+                                    EKey: $(this).attr("cmc_paymentgatewayencryptionkey")
+                                };
+                            }).get();
+                            // Assign the extracted data to the global variable
+                            paymentGatewayInfo = paymentGatewayData;
+                            console.log("paymentGatewayData", paymentGatewayInfo);
+                        },
+                        error: function(xhr, status, error) {
+                            console.error("Error:", error);
+                        }
+                    });
+                }
+
+                // Call the paymentGateway function to fetch the payment gateway information
+                $(document).ready(function() {
+                    paymentGateway();
+                });
+
+
+                function GetInvoices(contactId) {
+                    var resp = $.ajax({
+                        url: location.origin + "/SavedQueryService/Execute/invoices/" + contactId,
+                        async: false,
+                        dataType: "JSON",
+                    }).responseJSON;
+                
+                    console.log("resp", resp);
+                
+                    // Extract data from response
+                var invoicenames = resp.data.map(item => ({
+                    id: item.Id,
+                    name: item.Attributes["name"],
+                    MonthlyAmt: item.Attributes["cmcps_monthlypayment"],
+                    TotalAmt: item.Attributes["cmcps_remainingbalance"],
+                    Campus: item.FormattedValues["cmcps_campus"],
+                    AcademicPeriod: item.FormattedValues["cmcps_academicperiod"]
+    
+                }));
+                
+                    console.log("invoicenames", invoicenames);
+                
+                    return invoicenames;
+                }
+                
+                document.addEventListener("DOMContentLoaded", function() {
+                    // Call the function to populate the dropdown
+                    var invoicesData = GetInvoices(contactId); // Call GetInvoices to get invoices data
+                    populateInvoiceNameDropdown(invoicesData); // Pass invoicenames data to populate dropdown
+                });
+                
+                function populateInvoiceNameDropdown(invoicesData) {
+                    var dropdown = document.getElementById("Dropdown-1");
+                
+                    if (dropdown) {
+                        dropdown.innerHTML = ""; // Clear existing options
+                        var defaultOption = document.createElement("option");
+                        defaultOption.value = "";
+                        defaultOption.text = "- Select -";
+                        dropdown.appendChild(defaultOption);
+                
+                        // Populate dropdown with invoice names and attach IDs as values
+                    invoicesData.forEach(function(invoice) {
+                        var option = document.createElement("option");
+                        option.value = invoice.id; // Attach invoice ID as value
+                        option.text = invoice.name;
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    console.error("Dropdown element with ID 'Dropdown-1' not found.");
+                }
+            }
+    
+            document.addEventListener("DOMContentLoaded", function() {
+                // Call the function to populate the dropdown
+                GetInvoices(contactId);
+            });
+                
+            // Populate the second picklist with monthly and total amounts based on selected invoice
+            function populateAmounts() {
+                var dropdown2 = document.getElementById("Dropdown-2");
+                var selectedInvoiceId = document.getElementById("Dropdown-1").value;
+                var invoicesData = GetInvoices(contactId); // Fetch all invoices data
+    
+                // Find the selected invoice from invoices data by ID
+                var selectedInvoice = invoicesData.find(invoice => invoice.id === selectedInvoiceId);
+                console.log("selectedInvoice", selectedInvoice);
+                console.log("selectedInvoiceId", selectedInvoiceId);
+    
+                if (selectedInvoice) { // Check if selectedInvoice is not undefined
+                    if (dropdown2) {
+                        dropdown2.innerHTML = ""; // Clear existing options
+                        var defaultOption = document.createElement("option");
+                        defaultOption.value = "";
+                        defaultOption.text = "- Select -";
+                        dropdown2.appendChild(defaultOption);
+                
+                        // Populate dropdown with monthly and total amounts based on the selected invoice
+                        var option = document.createElement("option");
+                        option.value = selectedInvoice.MonthlyAmt.Value; // Set value for monthly payment
+                        option.text = "Monthly: " + selectedInvoice.MonthlyAmt.Value; // Set text for monthly payment
+                        dropdown2.appendChild(option);
+                
+                        // Create another option for total remaining balance
+                        var option2 = document.createElement("option");
+                        option2.value = selectedInvoice.TotalAmt.Value; // Set value for remaining balance
+                        option2.text = "Total Remaining: " + selectedInvoice.TotalAmt.Value; // Set text for remaining balance
+                        dropdown2.appendChild(option2);
+                
+                        // Create additional option if needed
+                        var option3 = document.createElement("option");
+                        option3.value = "Other"; // Set value for other amount
+                        option3.text = "Other Amount"; // Set text for other amount
+                        dropdown2.appendChild(option3);
+                    }
+                } else {
+                    console.error("Selected invoice not found in invoices data.");
+                }
+            }
+    
+            document.addEventListener("DOMContentLoaded", function() {
+                // Add event listener for Dropdown-1
+                document.getElementById("Dropdown-1").addEventListener("change", function() {
+                    populateAmounts(); // Call populateAmounts when Dropdown-1 value changes
+                });
+    
+                // Call the function to populate the dropdown
+                GetInvoices(contactId);
+            });
+    
+            // Add event listener to Dropdown-2
+            document.addEventListener("DOMContentLoaded", function() {
+                var dropdown2 = document.getElementById("Dropdown-2"); // Define dropdown2 here
+    
+                if (dropdown2) {
+                    dropdown2.addEventListener("change", function() {
+                        var selectedOption = dropdown2.options[dropdown2.selectedIndex];
+                        var otherAmountTextbox = document.getElementsByClassName("sf-fieldWrp");
+    
+                        // Check if the selected option is "Other Amount"
+                        if (selectedOption.value === "Other") {
+                            // Show Textbox-1
+                            otherAmountTextbox.style.display = "block";
+                        } else {
+                            // Hide Textbox-1
+                            otherAmountTextbox.style.display = "none";
+                        }
+                    });
+                } else {
+                    console.error("Dropdown element with ID 'Dropdown-2' not found.");
+                }
+            });
+            }
+        </script>
+        <script> 
+            // Function to send the request to Authorize.net Form Token
+            function sendAuthorizeNetRequest(event,paymentGatewayInfo) {
+                event.preventDefault(); // Prevent page refresh
+                var amount = document.getElementById("Dropdown-2").value; // Get amount from dropdown
+                if (amount === "Other") {
+                    // Get other amount from textbox
+                    amount = document.getElementById("Textbox-1").value;
+                }
+                var invoicename = document.getElementById("Dropdown-1").options[document.getElementById(
+                    "Dropdown-1").selectedIndex].text; // Get invoice name from dropdown
+                console.log("amount", amount);
+                console.log("invoicename", invoicename);
+    
+                // XML settings
+                var xmlSettings = `<?xml version="1.0" encoding="utf-8"?>
+                <getHostedPaymentPageRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+                    <merchantAuthentication>
+                        <name>${paymentGatewayInfo[0].username}</name>
+                        <transactionKey>${paymentGatewayInfo[0].Key}</transactionKey>
+                    </merchantAuthentication>
+                    <transactionRequest>
+                        <transactionType>authCaptureTransaction</transactionType>
+                        <amount>${amount}</amount>
+                        <order>
+                            <description>${invoicename}</description>
+                        </order>
+                      <customer>
+                        <email>${userEmail}</email>
+                      </customer>
+                    </transactionRequest>
+                    <hostedPaymentSettings>
+                        <setting>
+                            <settingName>hostedPaymentReturnOptions</settingName>
+                            <settingValue>{"showReceipt": true, "url": "https://engagecms-tst-300982.campusnexus.cloud/receipt", "urlText": "Continue", "cancelUrl": "https://engagecms-tst-300982.campusnexus.cloud/", "cancelUrlText": "Cancel"}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentButtonOptions</settingName>
+                            <settingValue>{"text": "Pay"}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentStyleOptions</settingName>
+                            <settingValue>{"bgColor": "#23b850"}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentPaymentOptions</settingName>
+                            <settingValue>{"cardCodeRequired": true, "showCreditCard": true, "showBankAccount": true}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentSecurityOptions</settingName>
+                            <settingValue>{"captcha": false}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentShippingAddressOptions</settingName>
+                            <settingValue>{"show": false, "required": false}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentBillingAddressOptions</settingName>
+                            <settingValue>{"show": true, "required":true}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentCustomerOptions</settingName>
+                            <settingValue>{"showEmail": true, "requiredEmail": true, "addPaymentProfile": true}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentOrderOptions</settingName>
+                            <settingValue>{"show": true, "merchantName": "Charis Bible College"}</settingValue>
+                        </setting>
+                        <setting>
+                            <settingName>hostedPaymentIFrameCommunicatorUrl</settingName>
+                            <settingValue>{"url": "https://engagecms-tst-300982.campusnexus.cloud/portal/dashboard/my-dashboard/payments"}</settingValue>
+                        </setting>
+                    </hostedPaymentSettings>
+                </getHostedPaymentPageRequest>`;
+    
+                console.log("xmlSettings", xmlSettings);
+                 // Make AJAX request to get form token
+                 $.ajax({
+                    type: "POST",
+                    url: "https://apitest.authorize.net/xml/v1/request.api",
+                    contentType: "text/xml",
+                    dataType: "xml",
+                    data: xmlSettings,
+                    success: function(data) {
+                        var formToken = $(data).find("token").text();
+                        console.log("formToken", formToken);
+                        if (formToken !== "") {
+                            $("#inputtoken").val(formToken);
+                            $("#popupToken").val(formToken);
+                            $("#iframeAuthorizeNet").show();
+                            // Append HTML form to the body
+                            // Create a form dynamically
+                            var form = $('<form method="post" action="https://test.authorize.net/payment/payment" id="formAuthorizeNetPopup" name="formAuthorizeNetPopup" target="iframeAuthorizeNet"></form>');
+                            // Add necessary input fields
+                            form.append('<input type="hidden" name="token" value="' + formToken + '">');                            
+                            // Append the form to the body and submit it
+                            $('body').append(form);
+                            form.submit();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error:", error);
+                    }
+                });
+        }
+        document.getElementById("btnOpenAuthorizeNetPopup").addEventListener("click", sendAuthorizeNetRequest);
+        document.getElementById("iframeAuthorizeNet").addEventListener("load", function() {
+            var iframePosition = document.getElementById("iframeAuthorizeNet").getBoundingClientRect().top;
+            window.scrollTo({
+                top: window.scrollY + iframePosition,
+                behavior: 'smooth'
+            });
+        });
+        (function () {
+			if (!window.AuthorizeNetIFrame) window.AuthorizeNetIFrame = {};
+				AuthorizeNetIFrame.onReceiveCommunication = function (querystr) {
+					var params = parseQueryString(querystr);
+						switch (params["action"]) {
+							case "successfulSave":
+								break;
+							case "cancel":
+								break;
+							case "resizeWindow":
+								var w = parseInt(params["width"]);
+								var h = parseInt(params["height"]);
+								var ifrm = document.getElementById("iframeAuthorizeNet");
+								ifrm.style.width = w.toString() + "px";
+								ifrm.style.height = h.toString() + "px";
+								break;
+							case "transactResponse":
+								var ifrm = document.getElementById("iframeAuthorizeNet");
+								ifrm.style.display = 'none';
+							}
+					};
+
+				function parseQueryString(str) {
+					var vars = [];
+					var arr = str.split('&');
+					var pair;
+					for (var i = 0; i < arr.length; i++) {
+						pair = arr[i].split('=');
+						vars.push(pair[0]);
+						vars[pair[0]] = unescape(pair[1]);
+						}
+					return vars;
+					}
+		}());
+
+        </script>
+    </body>
+    </html>
