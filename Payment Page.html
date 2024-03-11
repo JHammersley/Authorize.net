@@ -3,7 +3,7 @@
     <body>
         <br />
         <div>
-            <button id="btnOpenAuthorizeNetPopup">Open AuthorizeNetPopup</button>
+            <button id="btnOpenAuthorizeNetPopup" class="btn btn-primary font-weight-bold">Continue to Payment</button>
         </div>
         <div id="iframe_holder" class="center-block" style="width: 100%; height: 100vh; overflow: hidden;">
             <iframe id="iframeAuthorizeNet" name="iframeAuthorizeNet" class="embed-responsive-item panel" 
@@ -45,41 +45,55 @@
                 console.log("CRM User ID:", crmUserId);
                 console.log("Parent Customer ID:", parentCustomerId);
                 console.log("Parent Customer Type:", parentCustomerType);
-    
-    
+
+				var studentUID;
+
+				function extractStudentUID() {
+					// Extract the UID value from the element
+					var uid = $('#mshied_externalidentifier_0_readonly').text().trim(); 
+					// Set the global variable with the extracted UID
+					studentUID = uid;
+					console.log("studentUID", studentUID); // Log the value to the console
+				}
+					
                 // Declare a global variable to store the payment gateway information
-                var paymentGatewayInfo;
-
-                // Define the paymentGateway function
-                function paymentGateway() {
-                    $.ajax({
+				var paymentGatewayusername;
+				var paymentGatewaypassword;
+					console.log("paymentGatewayusername", paymentGatewayusername);
+					console.log("paymentGatewaypassword", paymentGatewaypassword);
+                function paymentgatway() {
+                    var paymentgw = $.ajax({
                         url: location.origin + "/SavedQueryService/Execute/paymentgateway",
-                        async: true, // Set async to true to make it asynchronous
-                        dataType: "json", 
-                        success: function(data) {
-                            // Extract data from response
-                            var paymentGatewayData = $(data).find("item").map(function() {
-                                return {
-                                    name: $(this).attr("cmc_paymentgateway"),
-                                    username: $(this).attr("cmc_paymentgatewayusername"),
-                                    Key: $(this).attr("cmc_paymentgatewaypassword"),
-                                    EKey: $(this).attr("cmc_paymentgatewayencryptionkey")
-                                };
-                            }).get();
-                            // Assign the extracted data to the global variable
-                            paymentGatewayInfo = paymentGatewayData;
-                            console.log("paymentGatewayData", paymentGatewayInfo);
-                        },
-                        error: function(xhr, status, error) {
-                            console.error("Error:", error);
-                        }
-                    });
-                }
+                        async: false,
+                        dataType: "JSON",
+                    }).responseJSON;
+                
+                    console.log("paymentgw", paymentgw);
+                
+                    // Extract data from response
+					var pgwdata = paymentgw.data.map(item => ({
+						name: item.Attributes["cmc_paymentgateway"],
+						username: item.Attributes["cmc_paymentgatewayusername"],
+						Key: item.Attributes["cmc_paymentgatewaypassword"],
+					}));
+                
+                    console.log("pgwdata", pgwdata);
+                
+					paymentGatewayusername = pgwdata[0].username;
+					paymentGatewaypassword = pgwdata[0].Key // Pass pgwdata 
 
-                // Call the paymentGateway function to fetch the payment gateway information
-                $(document).ready(function() {
-                    paymentGateway();
-                });
+                    return pgwdata;
+
+                }
+                
+                window.onload = function() {
+                    // Call the function to populate the dropdown
+                    paymentgatway(); // Call GetInvoices to get invoices data
+					extractStudentUID(); // Call extractStudentUID to get studentUIDData
+                };
+
+                document.querySelector('div[data-sf-role="text-field-container"]').style.display = "none";
+
 
 
                 function GetInvoices(contactId) {
@@ -92,15 +106,18 @@
                     console.log("resp", resp);
                 
                     // Extract data from response
-                var invoicenames = resp.data.map(item => ({
-                    id: item.Id,
-                    name: item.Attributes["name"],
-                    MonthlyAmt: item.Attributes["cmcps_monthlypayment"],
-                    TotalAmt: item.Attributes["cmcps_remainingbalance"],
-                    Campus: item.FormattedValues["cmcps_campus"],
-                    AcademicPeriod: item.FormattedValues["cmcps_academicperiod"]
-    
-                }));
+                  var invoicenames = resp.data.map(item => ({
+                        id: item.Id,
+                        name: item.Attributes["name"],
+                        MonthlyAmt: {
+                            value: item.Attributes["cmcps_monthlypayment"],
+                            FormattedValues: item.FormattedValues["cmcps_monthlypayment"]
+                        },
+                        TotalAmt: {
+                            value: item.Attributes["cmcps_remainingbalance"],
+                            FormattedValues: item.FormattedValues["cmcps_remainingbalance"]
+                        }
+                    }));
                 
                     console.log("invoicenames", invoicenames);
                 
@@ -161,14 +178,14 @@
                 
                         // Populate dropdown with monthly and total amounts based on the selected invoice
                         var option = document.createElement("option");
-                        option.value = selectedInvoice.MonthlyAmt.Value; // Set value for monthly payment
-                        option.text = "Monthly: " + selectedInvoice.MonthlyAmt.Value; // Set text for monthly payment
+                        option.value = selectedInvoice.MonthlyAmt.FormattedValues; // Set value for monthly payment
+                        option.text = "Monthly: " + selectedInvoice.MonthlyAmt.FormattedValues; // Set text for monthly payment
                         dropdown2.appendChild(option);
                 
                         // Create another option for total remaining balance
                         var option2 = document.createElement("option");
-                        option2.value = selectedInvoice.TotalAmt.Value; // Set value for remaining balance
-                        option2.text = "Total Remaining: " + selectedInvoice.TotalAmt.Value; // Set text for remaining balance
+                        option2.value = selectedInvoice.TotalAmt.FormattedValues; // Set value for remaining balance
+                        option2.text = "Total Remaining: " + selectedInvoice.TotalAmt.FormattedValues; // Set text for remaining balance
                         dropdown2.appendChild(option2);
                 
                         // Create additional option if needed
@@ -199,7 +216,7 @@
                 if (dropdown2) {
                     dropdown2.addEventListener("change", function() {
                         var selectedOption = dropdown2.options[dropdown2.selectedIndex];
-                        var otherAmountTextbox = document.getElementsByClassName("sf-fieldWrp");
+                        var otherAmountTextbox = document.querySelector('div[data-sf-role="text-field-container"]');
     
                         // Check if the selected option is "Other Amount"
                         if (selectedOption.value === "Other") {
@@ -220,11 +237,15 @@
             // Function to send the request to Authorize.net Form Token
             function sendAuthorizeNetRequest(event,paymentGatewayInfo) {
                 event.preventDefault(); // Prevent page refresh
-                var amount = document.getElementById("Dropdown-2").value; // Get amount from dropdown
-                if (amount === "Other") {
-                    // Get other amount from textbox
-                    amount = document.getElementById("Textbox-1").value;
-                }
+                  var amountValue = document.getElementById("Dropdown-2").value; // Get amount value from dropdown
+                  var amount; // Initialize amount variable
+                    if (amountValue === "Other") {
+                        // Get other amount from textbox
+                        amount = document.getElementById("Textbox-1").value;
+                    } else {
+                        // Remove "$" symbol from the value retrieved from the dropdown
+                        amount = amountValue.replace(/[$,]/g, "");
+                    }
                 var invoicename = document.getElementById("Dropdown-1").options[document.getElementById(
                     "Dropdown-1").selectedIndex].text; // Get invoice name from dropdown
                 console.log("amount", amount);
@@ -234,23 +255,29 @@
                 var xmlSettings = `<?xml version="1.0" encoding="utf-8"?>
                 <getHostedPaymentPageRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
                     <merchantAuthentication>
-                        <name>${paymentGatewayInfo[0].username}</name>
-                        <transactionKey>${paymentGatewayInfo[0].Key}</transactionKey>
+                        <name>${paymentGatewayusername}</name>
+                        <transactionKey>${paymentGatewaypassword}</transactionKey>
                     </merchantAuthentication>
+					<refId>${studentUID}</refId>
                     <transactionRequest>
                         <transactionType>authCaptureTransaction</transactionType>
                         <amount>${amount}</amount>
+						<profile>
+							<customerProfileId>${studentUID}</customerProfileId>
+						</profile>	
                         <order>
                             <description>${invoicename}</description>
                         </order>
                       <customer>
+						<type>individual</type>
+						<id>${studentUID}</id>
                         <email>${userEmail}</email>
                       </customer>
-                    </transactionRequest>
+                    </transactionRequest>				
                     <hostedPaymentSettings>
                         <setting>
                             <settingName>hostedPaymentReturnOptions</settingName>
-                            <settingValue>{"showReceipt": true, "url": "https://engagecms-tst-300982.campusnexus.cloud/receipt", "urlText": "Continue", "cancelUrl": "https://engagecms-tst-300982.campusnexus.cloud/", "cancelUrlText": "Cancel"}</settingValue>
+                            <settingValue>{"showReceipt": true, "url": "https://engagecms-tst-300982.campusnexus.cloud/", "urlText": "Continue", "cancelUrl": "https://engagecms-tst-300982.campusnexus.cloud/", "cancelUrlText": "Cancel"}</settingValue>
                         </setting>
                         <setting>
                             <settingName>hostedPaymentButtonOptions</settingName>
@@ -258,7 +285,7 @@
                         </setting>
                         <setting>
                             <settingName>hostedPaymentStyleOptions</settingName>
-                            <settingValue>{"bgColor": "#23b850"}</settingValue>
+                            <settingValue>{"bgColor": "#7d0023"}</settingValue>
                         </setting>
                         <setting>
                             <settingName>hostedPaymentPaymentOptions</settingName>
@@ -365,5 +392,28 @@
 		}());
 
         </script>
+        <script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        // Add event listener for Dropdown-1
+        document.getElementById("Dropdown-1").addEventListener("change", function() {
+            // Call function to hide form
+            hideForm();
+        });
+
+        // Add event listener for Dropdown-2
+        document.getElementById("Dropdown-2").addEventListener("change", function() {
+            // Call function to hide form
+            hideForm();
+        });
+    });
+
+    // Function to hide the form
+    function hideForm() {
+        var iframeAuthorizeNet = document.getElementById("iframeAuthorizeNet");
+        if (iframeAuthorizeNet) {
+            iframeAuthorizeNet.style.display = "none"; // Hide the form
+        }
+    }
+</script>
     </body>
     </html>
