@@ -139,6 +139,11 @@
                         defaultOption.value = "";
                         defaultOption.text = "- Select -";
                         dropdown.appendChild(defaultOption);
+
+                         // Sort invoicesData array by name
+                        invoicesData.sort(function(a, b) {
+                            return a.name.localeCompare(b.name);
+                        });
                 
                         // Populate dropdown with invoice names and attach IDs as values
                     invoicesData.forEach(function(invoice) {
